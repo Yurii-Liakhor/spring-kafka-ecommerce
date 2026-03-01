@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +42,7 @@ public class OrderServiceImpl implements OrderService {
         this.orderRepository = orderRepository;
     }
 
+    @Transactional
     @Override
     public String createOrder(OrderDTO orderDTO) {
         String orderUuid = UUID.randomUUID().toString();
@@ -84,6 +86,7 @@ public class OrderServiceImpl implements OrderService {
         return new ProductReservationItem(product.getProductId(), product.getQuantity());
     }
 
+    @Transactional
     @Override
     public void cancelOrder(String orderUuid) {
         log.debug("Canceling order {}", orderUuid);
@@ -91,6 +94,7 @@ public class OrderServiceImpl implements OrderService {
         updateStatus(orderUuid, OrderStatus.CANCELLED);
     }
 
+    @Transactional
     @Override
     public void confirmOrder(String orderUuid) {
         log.debug("Confirming order {}", orderUuid);
@@ -98,6 +102,7 @@ public class OrderServiceImpl implements OrderService {
         updateStatus(orderUuid, OrderStatus.CONFIRMED);
     }
 
+    @Transactional
     @Override
     public void reserveOrder(String orderUuid) {
         log.debug("Reserving order {}", orderUuid);
@@ -108,6 +113,11 @@ public class OrderServiceImpl implements OrderService {
     private void updateStatus(String orderUuid, OrderStatus status) {
         Order order = orderRepository.findByUuid(orderUuid)
                 .orElseThrow(() -> new NoSuchElementException("Order not found: " + orderUuid));
+
+        if (order.getStatus() == status) {
+            return;
+        }
+
         order.setStatus(status);
         orderRepository.save(order);
     }

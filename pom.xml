@@ -28,7 +28,8 @@
         <module>order-service</module>
 		<module>inventory-service</module>
 		<module>shared-events</module>
-	</modules>
+        <module>pay-service</module>
+    </modules>
 
     <scm>
 		<connection/>
