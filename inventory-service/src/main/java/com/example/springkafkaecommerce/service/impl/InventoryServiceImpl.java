@@ -12,6 +12,7 @@ import com.example.springkafkaecommerce.service.InventoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -34,10 +35,15 @@ public class InventoryServiceImpl implements InventoryService {
         this.productRepository = productRepository;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Override
-    public void reserveProducts(List<ProductReservationItem> products) {
-        log.debug("Reserving products: {}", products);
+    public void reserveProducts(String orderUuid, List<ProductReservationItem> products) {
+        if (productReservationRepository.existsByOrderUuid(orderUuid)) {
+            log.debug("Products already reserved for orderUuid: {}, skipping", orderUuid);
+            return;
+        }
+
+        log.debug("Reserving products for orderUuid: {}", orderUuid);
         for (ProductReservationItem item : products) {
             int updated = inventoryRepository.tryReserve(item.productId(), item.quantity());
             if (updated < 1) {
@@ -47,6 +53,7 @@ public class InventoryServiceImpl implements InventoryService {
 
             Product product = productRepository.getReferenceById(item.productId());
             productReservationRepository.save(ProductReservation.builder()
+                    .orderUuid(orderUuid)
                     .product(product)
                     .reservedQuantity(item.quantity())
                     .state(ReservationState.ACTIVE)

@@ -6,35 +6,42 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.Instant;
 
+@Entity
+@Table(name = "outbox")
 @Getter
-@Builder
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Table(
-    name = "processed_events",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"event_id", "topic"})
-)
-public class ProcessedEvent {
+@Builder
+public class OutboxEvent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "event_id", nullable = false)
-    private String eventId;
+    @Column(nullable = false)
+    private String aggregateId;
 
-    @Column(name = "topic", nullable = false)
+    @Column(nullable = false)
     private String topic;
 
-    @Column(name = "processed_at", nullable = false)
-    private Instant processedAt;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String payload;
+
+    @Column(nullable = false)
+    private String eventClass;
+
+    @Column(nullable = false)
+    private boolean published = false;
+
+    @Column(nullable = false)
+    private Instant createdAt;
 }

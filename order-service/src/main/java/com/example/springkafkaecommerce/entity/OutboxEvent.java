@@ -1,11 +1,7 @@
 package com.example.springkafkaecommerce.entity;
 
-import com.example.springkafkaecommerce.model.PaymentProvider;
-import com.example.springkafkaecommerce.model.PaymentStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -18,37 +14,34 @@ import lombok.Setter;
 
 import java.time.Instant;
 
+@Entity
+@Table(name = "outbox")
 @Getter
 @Setter
-@Builder
-@AllArgsConstructor
 @NoArgsConstructor
-@Entity
-@Table(name = "payment")
-public class Payment {
+@AllArgsConstructor
+@Builder
+public class OutboxEvent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private String paymentUuid;
-
-    @Column(nullable = false, unique = true)
-    private String orderUuid;
+    private String aggregateId;   // orderUuid / paymentUuid — ключ повідомлення в Kafka
 
     @Column(nullable = false)
-    private long amount;
+    private String topic;
 
-    private String currency;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String payload;       // серіалізований JSON події
 
-    @Enumerated(EnumType.STRING)
-    private PaymentStatus status;
+    @Column(nullable = false)
+    private String eventClass;    // повне ім'я класу для десеріалізації у poller
 
-    private String paymentMethod;
+    @Column(nullable = false)
+    private boolean published = false;
 
-    @Enumerated(EnumType.STRING)
-    private PaymentProvider provider;
-
+    @Column(nullable = false)
     private Instant createdAt;
 }

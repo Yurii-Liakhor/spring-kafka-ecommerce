@@ -22,9 +22,7 @@ public class PayEventListener {
 
     @KafkaListener(topics = KafkaTopics.INVENTORY_RESERVED_TOPIC, groupId = PAY_SERVICE_GROUP)
     public void consumeProductReserved(InventoryEvent inventoryEvent) {
-        String orderUuid = inventoryEvent.orderUuid();
-        log.debug("Consuming inventory reserved event. orderUuid: {}", orderUuid);
-
+        log.debug("Consuming inventory reserved event. orderUuid: {}", inventoryEvent.orderUuid());
         inventoryEventHandler.handlePayment(inventoryEvent);
     }
 }

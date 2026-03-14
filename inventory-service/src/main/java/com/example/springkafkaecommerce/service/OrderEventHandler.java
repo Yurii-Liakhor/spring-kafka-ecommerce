@@ -1,50 +1,58 @@
 package com.example.springkafkaecommerce.service;
 
+import com.example.springkafkaecommerce.entity.OutboxEvent;
 import com.example.springkafkaecommerce.event.InventoryEvent;
 import com.example.springkafkaecommerce.event.OrderEvent;
 import com.example.springkafkaecommerce.exception.OutOfStockException;
 import com.example.springkafkaecommerce.kafka.KafkaTopics;
-import org.springframework.kafka.core.KafkaTemplate;
+import com.example.springkafkaecommerce.repository.OutboxRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Collections;
-import java.util.concurrent.ExecutionException;
 
 @Service
 public class OrderEventHandler {
 
-    private final KafkaTemplate<String, InventoryEvent> kafkaTemplate;
+    private final OutboxRepository outboxRepository;
+    private final ObjectMapper objectMapper;
     private final InventoryService inventoryService;
-    private final ProcessedEventService processedEventService;
 
-    public OrderEventHandler(KafkaTemplate<String, InventoryEvent> kafkaTemplate, InventoryService inventoryService, ProcessedEventService processedEventService) {
-        this.kafkaTemplate = kafkaTemplate;
+    public OrderEventHandler(OutboxRepository outboxRepository,
+                             ObjectMapper objectMapper,
+                             InventoryService inventoryService) {
+        this.outboxRepository = outboxRepository;
+        this.objectMapper = objectMapper;
         this.inventoryService = inventoryService;
-        this.processedEventService = processedEventService;
     }
 
-    @Transactional
+    // Немає @Transactional — reserveProducts використовує REQUIRES_NEW і комітить самостійно.
+    // Збереження outbox відбувається одразу після, у власній Spring Data JPA транзакції.
     public void handleOrderCreated(OrderEvent orderEvent) {
-        try {
-            inventoryService.reserveProducts(orderEvent.reserveProducts());
-            sendAndWait(KafkaTopics.INVENTORY_RESERVED_TOPIC, orderEvent.orderUuid(),
-                    new InventoryEvent(orderEvent.orderUuid(), orderEvent.reserveProducts()));
-        } catch (OutOfStockException e) {
-            sendAndWait(KafkaTopics.INVENTORY_OUT_OF_STOCK_TOPIC, orderEvent.orderUuid(),
-                    new InventoryEvent(orderEvent.orderUuid(), Collections.emptyList()));
-        }
-        processedEventService.markAsProcessed(orderEvent.orderUuid(), KafkaTopics.ORDER_CREATED_TOPIC);
-    }
+        String topic;
+        InventoryEvent outEvent;
 
-    private void sendAndWait(String topic, String key, InventoryEvent event) {
         try {
-            kafkaTemplate.send(topic, key, event).get();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Kafka send interrupted", e);
-        } catch (ExecutionException e) {
-            throw new RuntimeException("Kafka send failed", e);
+            inventoryService.reserveProducts(orderEvent.orderUuid(), orderEvent.reserveProducts());
+            topic = KafkaTopics.INVENTORY_RESERVED_TOPIC;
+            outEvent = new InventoryEvent(orderEvent.orderUuid(), orderEvent.reserveProducts(), orderEvent.paymentData());
+        } catch (OutOfStockException e) {
+            topic = KafkaTopics.INVENTORY_OUT_OF_STOCK_TOPIC;
+            outEvent = new InventoryEvent(orderEvent.orderUuid(), Collections.emptyList(), orderEvent.paymentData());
+        }
+
+        try {
+            outboxRepository.save(OutboxEvent.builder()
+                    .aggregateId(orderEvent.orderUuid())
+                    .topic(topic)
+                    .payload(objectMapper.writeValueAsString(outEvent))
+                    .eventClass(InventoryEvent.class.getName())
+                    .createdAt(Instant.now())
+                    .build());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize InventoryEvent for orderUuid: " + orderEvent.orderUuid(), e);
         }
     }
 }

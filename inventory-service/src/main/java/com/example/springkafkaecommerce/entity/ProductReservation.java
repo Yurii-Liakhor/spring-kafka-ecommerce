@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,12 +24,16 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "product_reservation")
+@Table(name = "product_reservation",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"order_uuid", "product_id"}))
 public class ProductReservation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "order_uuid", nullable = false)
+    private String orderUuid;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "product_id", nullable = false)

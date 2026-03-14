@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface InventoryService {
 
-    void reserveProducts(List<ProductReservationItem> productReservationItems);
+    void reserveProducts(String orderUuid, List<ProductReservationItem> productReservationItems);
 }

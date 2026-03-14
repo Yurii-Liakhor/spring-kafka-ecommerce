@@ -2,7 +2,7 @@ package com.example.springkafkaecommerce.event;
 
 import java.util.List;
 
-public record OrderEvent(
+public record PaymentEvent(
         String orderUuid,
         List<ProductReservationItem> reserveProducts,
         PaymentData paymentData

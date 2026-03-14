@@ -4,19 +4,24 @@ import com.example.springkafkaecommerce.dto.OrderDTO;
 import com.example.springkafkaecommerce.dto.OrderItemDTO;
 import com.example.springkafkaecommerce.entity.Order;
 import com.example.springkafkaecommerce.entity.OrderItem;
+import com.example.springkafkaecommerce.entity.OutboxEvent;
 import com.example.springkafkaecommerce.event.OrderEvent;
+import com.example.springkafkaecommerce.event.PaymentData;
 import com.example.springkafkaecommerce.event.ProductReservationItem;
 import com.example.springkafkaecommerce.kafka.KafkaTopics;
 import com.example.springkafkaecommerce.model.OrderStatus;
 import com.example.springkafkaecommerce.repository.OrderRepository;
+import com.example.springkafkaecommerce.repository.OutboxRepository;
 import com.example.springkafkaecommerce.service.OrderService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,16 +33,19 @@ public class OrderServiceImpl implements OrderService {
 
     private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
 
-    private final KafkaTemplate<String, OrderEvent> kafkaTemplate;
+    private final OutboxRepository outboxRepository;
+    private final ObjectMapper objectMapper;
     private final Converter<Order, OrderDTO> orderConverter;
     private final OrderRepository orderRepository;
 
     public OrderServiceImpl(
-            KafkaTemplate<String, OrderEvent> kafkaTemplate,
+            OutboxRepository outboxRepository,
+            ObjectMapper objectMapper,
             Converter<Order, OrderDTO> orderConverter,
             OrderRepository orderRepository
     ) {
-        this.kafkaTemplate = kafkaTemplate;
+        this.outboxRepository = outboxRepository;
+        this.objectMapper = objectMapper;
         this.orderConverter = orderConverter;
         this.orderRepository = orderRepository;
     }
@@ -52,7 +60,17 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
 
         OrderEvent orderEvent = createOrderEvent(orderUuid, orderDTO);
-        kafkaTemplate.send(KafkaTopics.ORDER_CREATED_TOPIC, orderUuid, orderEvent);
+        try {
+            outboxRepository.save(OutboxEvent.builder()
+                    .aggregateId(orderUuid)
+                    .topic(KafkaTopics.ORDER_CREATED_TOPIC)
+                    .payload(objectMapper.writeValueAsString(orderEvent))
+                    .eventClass(OrderEvent.class.getName())
+                    .createdAt(Instant.now())
+                    .build());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize OrderEvent for orderUuid: " + orderUuid, e);
+        }
 
         return orderUuid;
     }
@@ -79,7 +97,17 @@ public class OrderServiceImpl implements OrderService {
                 : orderDTO.getOrderItems().stream()
                 .map(this::toProductReservationEvent)
                 .toList();
-        return new OrderEvent(orderUuid, products);
+        //todo payment data
+        PaymentData paymentData = new PaymentData(
+                null,
+                50,
+                "PLN",
+                null,
+                "CARD",
+                "PAYPAL",
+                null
+        );
+        return new OrderEvent(orderUuid, products, paymentData);
     }
 
     private ProductReservationItem toProductReservationEvent(OrderItemDTO product) {

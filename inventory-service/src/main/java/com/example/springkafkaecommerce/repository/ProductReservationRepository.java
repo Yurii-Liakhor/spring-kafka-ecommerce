@@ -9,6 +9,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ProductReservationRepository extends JpaRepository<ProductReservation, Long> {
 
+    boolean existsByOrderUuid(String orderUuid);
+
     @Query("""
             select coalesce(sum(pr.reservedQuantity), 0)
             from ProductReservation pr

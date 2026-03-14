@@ -3,7 +3,6 @@ package com.example.springkafkaecommerce.listener;
 import com.example.springkafkaecommerce.event.OrderEvent;
 import com.example.springkafkaecommerce.kafka.KafkaTopics;
 import com.example.springkafkaecommerce.service.OrderEventHandler;
-import com.example.springkafkaecommerce.service.ProcessedEventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -16,24 +15,14 @@ public class InventoryEventListener {
     private static final String INVENTORY_SERVICE_GROUP = "inventory-service-group";
 
     private final OrderEventHandler orderEventHandler;
-    private final ProcessedEventService processedEventService;
 
-    public InventoryEventListener(OrderEventHandler orderEventHandler,
-                                  ProcessedEventService processedEventService) {
+    public InventoryEventListener(OrderEventHandler orderEventHandler) {
         this.orderEventHandler = orderEventHandler;
-        this.processedEventService = processedEventService;
     }
 
     @KafkaListener(topics = KafkaTopics.ORDER_CREATED_TOPIC, groupId = INVENTORY_SERVICE_GROUP)
     public void consumeOrderCreated(OrderEvent orderEvent) {
-        String orderUuid = orderEvent.orderUuid();
-        log.debug("Consuming order created event {}", orderUuid);
-
-        if (processedEventService.isAlreadyProcessed(orderUuid, KafkaTopics.ORDER_CREATED_TOPIC)) {
-            log.warn("Duplicate event skipped orderUuid: {}", orderUuid);
-            return;
-        }
-
+        log.debug("Consuming order created event {}", orderEvent.orderUuid());
         orderEventHandler.handleOrderCreated(orderEvent);
     }
 }
