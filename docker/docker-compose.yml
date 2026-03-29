@@ -21,3 +21,24 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  order-service:
+    image: ghcr.io/yurii-liakhor/order-service:latest
+    ports:
+      - 8077:8077
+    depends_on:
+      - kafka
+
+  inventory-service:
+      image: ghcr.io/yurii-liakhor/inventory-service:latest
+      ports:
+        - 8078:8078
+      depends_on:
+        - kafka
+
+  pay-service:
+      image: ghcr.io/yurii-liakhor/pay-service:latest
+      ports:
+        - 8079:8079
+      depends_on:
+        - kafka
