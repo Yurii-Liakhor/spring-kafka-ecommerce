@@ -13,6 +13,8 @@ public interface OutboxRepository extends JpaRepository<OutboxEvent, Long> {
 
     List<OutboxEvent> findTop100ByPublishedFalseOrderByCreatedAtAsc();
 
+    boolean existsByAggregateIdAndTopic(String aggregateId, String topic);
+
     @Modifying
     @Transactional
     @Query("UPDATE OutboxEvent e SET e.published = true WHERE e.id = :id")

@@ -1,8 +1,9 @@
 # Spring Kafka E-Commerce
 
 A pet project demonstrating a microservice e-commerce architecture with Apache Kafka as the backbone
-for inter-service communication. The project implements the Outbox Pattern to guarantee reliable event
-delivery between services.
+for inter-service communication. The project implements the **Choreography-based Saga** pattern for
+distributed transaction management and the **Outbox Pattern** to guarantee reliable event delivery
+between services.
 
 ## Architecture
 
@@ -72,6 +73,45 @@ A shared Maven module containing event types and topic constants used across ser
 | `payment.paid`           | Pay Service       | Order Service     | Payment completed successfully     |
 | `payment.not-paid`       | Pay Service       | Order Service     | Payment declined or failed         |
 | `shipping.created`       | —                 | —                 | Reserved for future use            |
+
+## Choreography-based Saga
+
+The order fulfillment flow is implemented as a **Choreography-based Saga** — a pattern for managing
+distributed transactions across microservices without a central coordinator. Each service listens for
+events, performs its local transaction, and publishes the next event. If any step fails, compensating
+events trigger a rollback across the affected services.
+
+### Happy path
+
+```
+[Order Service]  ──► order.created
+                          │
+                 [Inventory Service]  ──► inventory.reserved
+                                               │
+                                      [Pay Service]  ──► payment.paid
+                                                              │
+                                                    [Order Service]
+                                                    status = CONFIRMED
+```
+
+### Compensation flows
+
+```
+Insufficient stock:
+  [Inventory Service]  ──► inventory.out-of-stock
+                                    │
+                          [Order Service]  status = CANCELLED
+
+Payment declined:
+  [Pay Service]  ──► payment.not-paid
+                           │
+                 [Order Service]  status = CANCELLED
+                 [Inventory Service]  reservation = RELEASED
+```
+
+Each service owns its own aggregate and reacts only to events it cares about — there is no central
+saga orchestrator. `order-service` is the **saga initiator** and also the final consumer that closes
+the transaction by setting the terminal order status (`CONFIRMED` or `CANCELLED`).
 
 ## Outbox Pattern
 

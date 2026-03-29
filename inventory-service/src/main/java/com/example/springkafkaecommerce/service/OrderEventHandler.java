@@ -8,6 +8,8 @@ import com.example.springkafkaecommerce.kafka.KafkaTopics;
 import com.example.springkafkaecommerce.repository.OutboxRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -15,6 +17,8 @@ import java.util.Collections;
 
 @Service
 public class OrderEventHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderEventHandler.class);
 
     private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
@@ -43,11 +47,17 @@ public class OrderEventHandler {
             outEvent = new InventoryEvent(orderEvent.orderUuid(), Collections.emptyList(), orderEvent.paymentData());
         }
 
+        if (outboxRepository.existsByAggregateIdAndTopic(orderEvent.orderUuid(), topic)) {
+            log.debug("Outbox event already exists for orderUuid={} topic={}, skipping", orderEvent.orderUuid(), topic);
+            return;
+        }
+
         try {
+            String payloadOutEvent = objectMapper.writeValueAsString(outEvent);
             outboxRepository.save(OutboxEvent.builder()
                     .aggregateId(orderEvent.orderUuid())
                     .topic(topic)
-                    .payload(objectMapper.writeValueAsString(outEvent))
+                    .payload(payloadOutEvent)
                     .eventClass(InventoryEvent.class.getName())
                     .createdAt(Instant.now())
                     .build());

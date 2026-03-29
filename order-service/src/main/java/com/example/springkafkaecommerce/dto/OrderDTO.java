@@ -1,5 +1,6 @@
 package com.example.springkafkaecommerce.dto;
 
+import com.example.springkafkaecommerce.event.PaymentData;
 import com.example.springkafkaecommerce.model.OrderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,4 +19,5 @@ public class OrderDTO {
     private String orderUuid;
     private OrderStatus status;
     private List<OrderItemDTO> orderItems;
+    private PaymentData paymentData;
 }

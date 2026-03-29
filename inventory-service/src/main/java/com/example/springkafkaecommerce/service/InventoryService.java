@@ -7,4 +7,6 @@ import java.util.List;
 public interface InventoryService {
 
     void reserveProducts(String orderUuid, List<ProductReservationItem> productReservationItems);
+
+    void releaseProducts(String orderUuid, List<ProductReservationItem> productReservationItems);
 }

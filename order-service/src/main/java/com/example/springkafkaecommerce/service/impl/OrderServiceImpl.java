@@ -61,17 +61,17 @@ public class OrderServiceImpl implements OrderService {
 
         OrderEvent orderEvent = createOrderEvent(orderUuid, orderDTO);
         try {
+            String orderEventPayload = objectMapper.writeValueAsString(orderEvent);
             outboxRepository.save(OutboxEvent.builder()
                     .aggregateId(orderUuid)
                     .topic(KafkaTopics.ORDER_CREATED_TOPIC)
-                    .payload(objectMapper.writeValueAsString(orderEvent))
+                    .payload(orderEventPayload)
                     .eventClass(OrderEvent.class.getName())
                     .createdAt(Instant.now())
                     .build());
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize OrderEvent for orderUuid: " + orderUuid, e);
         }
-
         return orderUuid;
     }
 
@@ -97,16 +97,8 @@ public class OrderServiceImpl implements OrderService {
                 : orderDTO.getOrderItems().stream()
                 .map(this::toProductReservationEvent)
                 .toList();
-        //todo payment data
-        PaymentData paymentData = new PaymentData(
-                null,
-                50,
-                "PLN",
-                null,
-                "CARD",
-                "PAYPAL",
-                null
-        );
+
+        PaymentData paymentData = orderDTO.getPaymentData();
         return new OrderEvent(orderUuid, products, paymentData);
     }
 
@@ -124,10 +116,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
-    public void confirmOrder(String orderUuid) {
-        log.debug("Confirming order {}", orderUuid);
+    public void payOrder(String orderUuid) {
+        log.debug("Pay order {}", orderUuid);
 
-        updateStatus(orderUuid, OrderStatus.CONFIRMED);
+        updateStatus(orderUuid, OrderStatus.PAID);
     }
 
     @Transactional

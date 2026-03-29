@@ -62,6 +62,31 @@ public class InventoryEventHandler {
                 .build();
         payment = paymentRepository.save(payment);
 
+        chargeAndSaveOutbox(payment, event);
+    }
+
+    private void republish(InventoryEvent event, Payment payment) {
+        if (payment.getStatus() == PaymentStatus.PENDING) {
+            chargeAndSaveOutbox(payment, event);
+            return;
+        }
+
+        String topic = payment.getStatus() == PaymentStatus.SUCCESS
+                ? KafkaTopics.PAYMENT_PAID_TOPIC
+                : KafkaTopics.PAYMENT_NOT_PAID_TOPIC;
+
+        if (outboxRepository.existsByAggregateIdAndTopic(payment.getPaymentUuid(), topic)) {
+            return;
+        }
+
+        saveOutbox(
+                payment.getPaymentUuid(),
+                topic,
+                new PaymentEvent(event.orderUuid(), event.reserveProducts(), event.paymentData())
+        );
+    }
+
+    private void chargeAndSaveOutbox(Payment payment, InventoryEvent event) {
         String topic;
         try {
             paymentGatewayProviderFactory.charge(payment);
@@ -72,20 +97,7 @@ public class InventoryEventHandler {
             topic = KafkaTopics.PAYMENT_NOT_PAID_TOPIC;
         }
         paymentRepository.save(payment);
-
-        saveOutbox(paymentUuid, topic, new PaymentEvent(event.orderUuid(), event.reserveProducts(), paymentData));
-    }
-
-    private void republish(InventoryEvent event, Payment payment) {
-        String topic = payment.getStatus() == PaymentStatus.SUCCESS
-                ? KafkaTopics.PAYMENT_PAID_TOPIC
-                : KafkaTopics.PAYMENT_NOT_PAID_TOPIC;
-
-        saveOutbox(
-                payment.getPaymentUuid(),
-                topic,
-                new PaymentEvent(event.orderUuid(), event.reserveProducts(), event.paymentData())
-        );
+        saveOutbox(payment.getPaymentUuid(), topic, new PaymentEvent(event.orderUuid(), event.reserveProducts(), event.paymentData()));
     }
 
     private void saveOutbox(String aggregateId, String topic, PaymentEvent paymentEvent) {

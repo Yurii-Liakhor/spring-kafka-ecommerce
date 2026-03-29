@@ -38,12 +38,12 @@ public class InventoryServiceImpl implements InventoryService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Override
     public void reserveProducts(String orderUuid, List<ProductReservationItem> products) {
+        log.debug("Reserving products for orderUuid: {}", orderUuid);
         if (productReservationRepository.existsByOrderUuid(orderUuid)) {
             log.debug("Products already reserved for orderUuid: {}, skipping", orderUuid);
             return;
         }
 
-        log.debug("Reserving products for orderUuid: {}", orderUuid);
         for (ProductReservationItem item : products) {
             int updated = inventoryRepository.tryReserve(item.productId(), item.quantity());
             if (updated < 1) {
@@ -60,5 +60,26 @@ public class InventoryServiceImpl implements InventoryService {
                     .createdAt(Instant.now())
                     .build());
         }
+    }
+
+    @Transactional
+    @Override
+    public void releaseProducts(String orderUuid, List<ProductReservationItem> products) {
+        log.debug("Release products for orderUuid: {}", orderUuid);
+        if (!productReservationRepository.existsByOrderUuidAndState(orderUuid, ReservationState.ACTIVE)) {
+            log.debug("No active reservation for orderUuid: {}, skipping", orderUuid);
+            return;
+        }
+
+        for (ProductReservationItem item : products) {
+            int updated = inventoryRepository.releaseReserve(item.productId(), item.quantity());
+            if (updated < 1) {
+                throw new RuntimeException("Failed to release product reservation");
+            }
+        }
+
+        List<ProductReservation> reservations = productReservationRepository.findAllByOrderUuid(orderUuid);
+        reservations.forEach(r -> r.setState(ReservationState.RELEASED));
+        productReservationRepository.saveAll(reservations);
     }
 }
