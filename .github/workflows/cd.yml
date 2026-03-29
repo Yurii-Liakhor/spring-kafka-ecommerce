@@ -1,14 +1,11 @@
 name: CD
 
 on:
-  workflow_run:
-    workflows: ["CI"]
+  push:
     branches: [master]
-    types: [completed]
 
 jobs:
   publish:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -29,6 +26,9 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Set lowercase owner
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Build JAR
         run: ./mvnw package -pl ${{ matrix.service }} -am -DskipTests
 
@@ -44,4 +44,4 @@ jobs:
         with:
           context: ${{ matrix.service }}
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:latest
+          tags: ghcr.io/${{ env.OWNER }}/${{ matrix.service }}:latest
