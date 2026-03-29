@@ -1,4 +1,4 @@
-version: '2'
+version: '3.8'
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.4
@@ -24,6 +24,7 @@ services:
 
   order-service:
     image: ghcr.io/yurii-liakhor/order-service:latest
+    platform: linux/arm64
     ports:
       - 8077:8077
     depends_on:
@@ -31,6 +32,7 @@ services:
 
   inventory-service:
       image: ghcr.io/yurii-liakhor/inventory-service:latest
+      platform: linux/arm64
       ports:
         - 8078:8078
       depends_on:
@@ -38,6 +40,7 @@ services:
 
   pay-service:
       image: ghcr.io/yurii-liakhor/pay-service:latest
+      platform: linux/arm64
       ports:
         - 8079:8079
       depends_on:
